@@ -1,0 +1,41 @@
+services:
+  backend:
+    build: ./backend
+    env_file: .env
+    ports: ["8000:8000"]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: http://backend:8000
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports: ["3000:3000"]
+    depends_on: [backend]
+
+  # Cámaras simuladas: docker compose --profile simulator up
+  mediamtx:
+    image: bluenviron/mediamtx:1.12.3
+    profiles: ["simulator"]
+    ports: ["8554:8554"]
+
+  camera-publisher:
+    image: linuxserver/ffmpeg:7.1.1
+    profiles: ["simulator"]
+    entrypoint: ["/bin/sh", "/publish.sh"]
+    volumes:
+      - ./simulator/publish.sh:/publish.sh:ro
+      - ./simulator/videos:/videos:ro
+    depends_on: [mediamtx]
+
+  # Worker de IA: docker compose --profile ai up
+  ai-worker:
+    build: ./ai-worker
+    profiles: ["ai"]
+    env_file: .env
+    environment:
+      BACKEND_URL: http://backend:8000
+    volumes:
+      - ./ai-worker/models:/models:ro
+    depends_on: [backend]
